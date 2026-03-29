@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notion Clock Widget</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --surface: #faf8f5;
+      --border: rgba(0,0,0,0.08);
+      --text-primary: #1a1714;
+      --text-muted: rgba(26,23,20,0.42);
+      --text-dim: rgba(26,23,20,0.20);
+      --accent: #a07840;
+      --accent-glow: rgba(160,120,64,0.14);
+      --track: rgba(0,0,0,0.07);
+      --bar-day: linear-gradient(90deg, #c9a86c 0%, #e0b96a 100%);
+      --bar-week: linear-gradient(90deg, #5b82c4 0%, #7aa2e0 100%);
+      --bar-week-glow: rgba(91,130,196,0.15);
+
+      /* Square size */
+      --size: 360px;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+    }
+
+    /* ── Square widget ── */
+    .widget {
+      width: var(--size);
+      height: var(--size);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px 26px 22px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* Ambient glow */
+    .widget::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 240px;
+      height: 120px;
+      background: radial-gradient(ellipse, rgba(201,168,108,0.10) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── Top section ── */
+    .top {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Greeting — 1.5× 15px = 22.5px */
+    .greeting {
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+      font-size: 22.5px;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+      opacity: 0;
+      animation: fadeSlideUp 0.6s ease forwards 0.05s;
+    }
+
+    /* Clock — no seconds */
+    .clock {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(58px, 17vw, 78px);
+      font-weight: 400;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      opacity: 0;
+      animation: fadeSlideUp 0.6s ease forwards 0.15s;
+    }
+
+    /* Date — 1.5× 12px = 18px */
+    .date-line {
+      font-size: 18px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0;
+      animation: fadeSlideUp 0.6s ease forwards 0.25s;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards 0.35s;
+    }
+
+    /* ── Progress section ── */
+    .progress-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .progress-block {
+      opacity: 0;
+      animation: fadeSlideUp 0.6s ease forwards;
+    }
+    .progress-block:nth-child(1) { animation-delay: 0.4s; }
+    .progress-block:nth-child(2) { animation-delay: 0.5s; }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 7px;
+      /* header width matches bar */
+      width: 60%;
+    }
+
+    .progress-label {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .progress-pct {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      font-weight: 500;
+    }
+
+    .pct-day  { color: var(--accent); }
+    .pct-week { color: #5b82c4; }
+
+    /* Bar track — 60% width */
+    .progress-track {
+      width: 60%;
+      height: 5px;
+      background: var(--track);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .fill-day  { background: var(--bar-day);  box-shadow: 0 0 8px var(--accent-glow); }
+    .fill-week { background: var(--bar-week); box-shadow: 0 0 8px var(--bar-week-glow); }
+
+    /* Tick marks */
+    .tick-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      width: 60%;
+      padding: 0 1px;
+    }
+
+    .tick {
+      width: 1px;
+      height: 3px;
+      background: var(--text-dim);
+      border-radius: 1px;
+    }
+
+    /* Footer dot */
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards 0.65s;
+    }
+
+    .footer-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.35;
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.2; }
+      50%       { opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget">
+
+    <div class="top">
+      <div class="greeting" id="greeting">Good Morning</div>
+      <div class="clock" id="clock">00:00</div>
+      <div class="date-line" id="dateline">–</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="progress-sections">
+      <div class="progress-block">
+        <div class="progress-header">
+          <span class="progress-label">Today</span>
+          <span class="progress-pct pct-day" id="pct-day">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-day" id="bar-day" style="width:0%"></div>
+        </div>
+        <div class="tick-row" id="ticks-day"></div>
+      </div>
+
+      <div class="progress-block">
+        <div class="progress-header">
+          <span class="progress-label">This Week</span>
+          <span class="progress-pct pct-week" id="pct-week">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-week" id="bar-week" style="width:0%"></div>
+        </div>
+        <div class="tick-row" id="ticks-week"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-dot"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const pad = n => String(n).padStart(2, '0');
+    const DAYS_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    function getGreeting(h) {
+      if (h >= 5  && h < 12) return 'Good Morning';
+      if (h >= 12 && h < 17) return 'Good Afternoon';
+      if (h >= 17 && h < 21) return 'Good Evening';
+      return 'Good Night';
+    }
+
+    function buildTicks(id, count) {
+      const row = document.getElementById(id);
+      for (let i = 0; i <= count; i++) {
+        const t = document.createElement('div');
+        t.className = 'tick';
+        row.appendChild(t);
+      }
+    }
+    buildTicks('ticks-day',  23);
+    buildTicks('ticks-week',  6);
+
+    function update() {
+      const now = new Date();
+      const h   = now.getHours();
+      const m   = now.getMinutes();
+      const s   = now.getSeconds();
+      const dow = now.getDay();
+
+      document.getElementById('greeting').textContent = getGreeting(h);
+      document.getElementById('clock').textContent    = `${pad(h)}:${pad(m)}`;
+
+      const y  = now.getFullYear();
+      const mo = now.getMonth() + 1;
+      const d  = now.getDate();
+      document.getElementById('dateline').textContent =
+        `${y}.${pad(mo)}.${pad(d)} — ${DAYS_EN[dow]}`;
+
+      const daySeconds = h * 3600 + m * 60 + s;
+      const dayPct     = (daySeconds / 86400) * 100;
+      document.getElementById('bar-day').style.width = dayPct.toFixed(2) + '%';
+      document.getElementById('pct-day').textContent = Math.round(dayPct) + '%';
+
+      const dowMon      = (dow + 6) % 7;
+      const weekSeconds = dowMon * 86400 + daySeconds;
+      const weekPct     = (weekSeconds / (7 * 86400)) * 100;
+      document.getElementById('bar-week').style.width = weekPct.toFixed(2) + '%';
+      document.getElementById('pct-week').textContent = Math.round(weekPct) + '%';
+    }
+
+    update();
+    setInterval(update, 1000);
+  </script>
+</body>
+</html>
